@@ -28,8 +28,16 @@ app.use(express.static('public'));
 // Insecure workaround to avoid having to push API key to repo.
 // Serves API key directly to front end.
 app.get('/key', (req, res) => {
-  res.setHeader('Content-Type', 'text/javascript');
-  res.send(`Cesium.Ion.defaultAccessToken = '${process.env.CESIUM_ION_KEY}';`);
+  const key = process.env.CESIUM_ION_KEY;
+
+  if (key) {
+    res.setHeader('Content-Type', 'text/javascript');
+    res.send(`Cesium.Ion.defaultAccessToken = '${key}';`);
+  } else {
+    // Cesium Ion will fall back to default token.
+    res.setHeader('Content-Type', 'text/javascript');
+    res.send('');
+  }
 });
 
 const port = 8080;
