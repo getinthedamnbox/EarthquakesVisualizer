@@ -1,3 +1,4 @@
+/* eslint-disable no-continue */
 /* eslint-disable no-underscore-dangle */
 /* global Cesium */
 
@@ -62,7 +63,7 @@ async function showEarthquakes(mode) {
       // Both earthquakes have already been marked as near another earthquake.
       // No comparison needed; skip this pair.
         if (earthquakes[i].nearOther && earthquakes[j].nearOther) {
-          break;
+          continue;
         }
 
         const distance = computeSurfaceDistance(earthquakes[i]._position, earthquakes[j]._position);
