@@ -2,7 +2,7 @@
 
 Displays earthquakes (magnitude 2.5+) from https://earthquake.usgs.gov/earthquakes/search/ over the period 2020-06-26 to 2020-07-03.
 
-Currently configured to display clusters of earthquakes (i.e., earthquakes that occurred near other earthquakes in the same time period). Can be switched to show only isolated earthquakes or all earthquakes via a 'mode' parameter (to be made controllable via UI in a future release).
+Can display clustered earthquakes (i.e., earthquakes that occurred near other earthquakes in the same time period), isolated earthquakes, or both. The distance for defining whether or not two earthquakes are clustered is configurable via the GUI.
 
 
 
