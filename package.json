@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "TODO"
+    "url": "https://github.com/getinthedamnbox/EarthquakesVisualizer"
   },
   "dependencies": {
     "compression": "^1.6.2",
