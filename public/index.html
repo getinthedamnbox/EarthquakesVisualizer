@@ -13,8 +13,25 @@
     <body>
         <div id="cesiumContainer"></div>
 
-        <div id="loadingIndicator" class="cover">
-            <div id="loadingIcon" class="loadingIndicator"></div>
+        <div class="toolbar-left">
+            Earthquakes to show:
+            <br />
+            <input id="checkboxClustered" type="checkbox" onclick="showEarthquakes();" checked> Clustered
+            <br />
+            <input id="checkboxIsolated" type="checkbox" onclick="showEarthquakes();" checked> Isolated
+            <br />
+            <br />
+            Distance between clustered earthquakes:
+            <br />
+            <input id="textboxDistance" type="text" value="50"> km
+            <br />
+            <input id="buttonRecompute" type="button" value="Re-identify Clusters" onclick="computeClusters();">
+        </div>
+
+        <div id="cover">
+            <h1 id="loadingMessage">
+                Identifying earthquake clusters...
+            </h1>
         </div>
 
         <script src="key"></script>

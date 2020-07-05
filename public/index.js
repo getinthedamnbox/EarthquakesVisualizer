@@ -1,18 +1,23 @@
 /* eslint-disable no-continue */
 /* eslint-disable no-underscore-dangle */
-/* global Cesium */
+/* global document Cesium */
 
 const viewer = new Cesium.Viewer('cesiumContainer', {});
+const cover = document.getElementById('cover');
+const checkboxClustered = document.getElementById('checkboxClustered');
+const checkboxIsolated = document.getElementById('checkboxIsolated');
+const textboxDistance = document.getElementById('textboxDistance');
 
-const kmlOptions = {
-  camera: viewer.scene.camera,
-  canvas: viewer.scene.canvas,
-};
+let currentEarthquakesData;
+const defaultNearnessDistance = 50;
 
-// If an earthquake is within this distance from another earthquake,
-// the two are considered to be near each other.
-// TODO: Make this value controllable by a UI element.
-const epsilon = 50000;
+function showCover() {
+  cover.style.display = 'block';
+}
+
+function hideCover() {
+  cover.style.display = 'none';
+}
 
 // Computes the overland distance between two Cartesian positions on the globe.
 function computeSurfaceDistance(position1, position2) {
@@ -42,64 +47,153 @@ function computeSurfaceDistance(position1, position2) {
   return -1;
 }
 
-// Displays a subset of earthquakes contained in the data file.
-// Acceptable values for mode:
+// Loads earthquake data from a KML file at the supplied path.
+async function loadKml(path) {
+  const kmlOptions = {
+    camera: viewer.scene.camera,
+    canvas: viewer.scene.canvas,
+  };
+
+  return Cesium.KmlDataSource.load(path, kmlOptions);
+}
+
+// Marks each earthquake in a earthquakesData KmlDataSource
+// as either being near another earthquake or not,
+// based on the nearnessDistance (in meters).
+async function markNearness(nearnessDistance, earthquakesData) {
+  const earthquakes = earthquakesData.entities.values;
+
+  // Perform pairwise O(n^2) comparison of distances between earthquakes.
+  for (let i = 0; i < earthquakes.length; i += 1) {
+    // The data source may contain entities other than earthquakes (e.g., folders).
+    // If the first entity does not have a position, assume it is not an earthquake and skip it.
+    if (!earthquakes[i]._position) {
+      continue;
+    }
+
+    for (let j = i + 1; j < earthquakes.length; j += 1) {
+      // If the second entity does not have a position, skip it.
+      if (!earthquakes[j]._position) {
+        continue;
+      }
+
+      // If both earthquakes have already been marked as near another earthquake,
+      // no comparison is needed; skip the pair.
+      if (earthquakes[i].nearOther && earthquakes[j].nearOther) {
+        continue;
+      }
+
+      const distance = computeSurfaceDistance(earthquakes[i]._position, earthquakes[j]._position);
+
+      // If the earthquakes are near each other, mark them both as such.
+      if (distance >= 0 && distance <= nearnessDistance) {
+        earthquakes[i].nearOther = true;
+        earthquakes[j].nearOther = true;
+      }
+    }
+  }
+}
+
+// Verifies that a string represents a valid visibility mode.
+// Acceptable modes:
+// 'all': Shows all earthquakes.
 // 'near': Shows clusters of earthquakes (i.e., that occurred near other recent earthquakes).
 // 'far': Shows isolated earthquakes (i.e., that occurred nowhere near other recent earthquakes).
-// 'all': Shows all earthquakes.
-async function showEarthquakes(mode) {
-  if (mode !== 'near' && mode !== 'far' && mode !== 'all') {
+// 'none': Shows no earthquakes.
+function isValidMode(mode) {
+  if (mode === 'all' || mode === 'near' || mode === 'far' || mode === 'none') {
+    return true;
+  }
+
+  return false;
+}
+
+// Marks each earthquake in a earthquakesData KmlDataSource
+// as either being visible or not, based on the mode.
+function markVisibility(earthquakesData, mode) {
+  if (!isValidMode(mode)) {
     return;
   }
 
-  const earthquakesData = await Cesium.KmlDataSource.load('data/earthquakes.kml', kmlOptions);
   const earthquakes = earthquakesData.entities.values;
 
-  if (mode !== 'all') {
-    // Pairwise O(n^2) comparison of distances between earthquakes
-    // with early termination when possible.
-    for (let i = 0; i < earthquakes.length; i += 1) {
-      for (let j = i + 1; j < earthquakes.length; j += 1) {
-      // Both earthquakes have already been marked as near another earthquake.
-      // No comparison needed; skip this pair.
-        if (earthquakes[i].nearOther && earthquakes[j].nearOther) {
-          continue;
-        }
+  // Based on the mode, show either clustered earthquakes or isolated earthquakes.
+  for (let i = 0; i < earthquakes.length; i += 1) {
+    const earthquake = earthquakes[i];
 
-        const distance = computeSurfaceDistance(earthquakes[i]._position, earthquakes[j]._position);
-
-        // If the earthquakes are near each other, mark them both as such.
-        if (distance >= 0 && distance <= epsilon) {
-          earthquakes[i].nearOther = true;
-          earthquakes[j].nearOther = true;
-        }
-      }
+    // If the entity does not have a position, assume it is not an earthquake. Leave it visible.
+    if (!earthquake._position) {
+      earthquake.show = true;
+      continue;
     }
 
-    const idsToRemove = [];
-
-    // Based on the mode, remove either clustered earthquakes or isolated earthquakes.
-    for (let i = 0; i < earthquakes.length; i += 1) {
-      const earthquake = earthquakes[i];
-
-      if (mode === 'near') {
-        if (!earthquake.nearOther) {
-          idsToRemove.push(earthquake.id);
-        }
-      } else if (mode === 'far') {
-        if (earthquake.nearOther) {
-          idsToRemove.push(earthquake.id);
-        }
-      }
+    switch (mode) {
+      case 'all':
+        earthquake.show = true;
+        break;
+      case 'near':
+        earthquake.show = earthquake.nearOther;
+        break;
+      case 'far':
+        earthquake.show = !earthquake.nearOther;
+        break;
+      case 'none':
+        earthquake.show = false;
+        break;
+      default:
+        earthquake.show = false;
     }
-
-    idsToRemove.forEach((id) => {
-      earthquakesData._entityCollection.removeById(id);
-    });
   }
-
-  viewer.dataSources.add(earthquakesData);
 }
 
-// TODO: Make the mode controllable by a UI element.
-showEarthquakes('near');
+// Determines which mode is appropriate based on checkboxes in the GUI
+// and updates the visibility of earthquakes accordingly.
+async function showEarthquakes() {
+  let mode;
+
+  if (checkboxClustered.checked && checkboxIsolated.checked) {
+    mode = 'all';
+  } else if (checkboxClustered.checked) {
+    mode = 'near';
+  } else if (checkboxIsolated.checked) {
+    mode = 'far';
+  } else {
+    mode = 'none';
+  }
+
+  markVisibility(currentEarthquakesData, mode);
+}
+
+// Preprocessing step.
+// Loads earthquake data and marks earthquakes as clustered or isolated,
+// based on the nearnessDistance provided in the GUI.
+async function computeClusters() {
+  showCover();
+
+  // If an earthquake is within this distance from another earthquake,
+  // the two are considered to be near each other.
+  let nearnessDistance = Number(textboxDistance.value);
+
+  // Handle bad user input.
+  if (Number.isNaN(nearnessDistance)) {
+    nearnessDistance = defaultNearnessDistance;
+    textboxDistance.value = nearnessDistance;
+  }
+
+  // Convert kilometers to meters.
+  nearnessDistance *= 1000;
+
+  if (currentEarthquakesData) {
+    viewer.dataSources.remove(currentEarthquakesData);
+  }
+
+  currentEarthquakesData = await loadKml('data/earthquakes.kml');
+  markNearness(nearnessDistance, currentEarthquakesData);
+  showEarthquakes('all', currentEarthquakesData);
+
+  viewer.dataSources.add(currentEarthquakesData);
+
+  hideCover();
+}
+
+computeClusters();

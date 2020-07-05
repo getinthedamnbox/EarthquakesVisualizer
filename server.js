@@ -41,7 +41,9 @@ app.get('/key', (req, res) => {
 });
 
 const port = 8080;
-const server = app.listen(port);
+const server = app.listen(port, () => {
+  console.log(`Server started on port ${port}`);
+});
 
 server.on('error', (e) => {
   console.log(e);
